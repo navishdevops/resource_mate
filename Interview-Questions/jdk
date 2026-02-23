@@ -1,5 +1,7 @@
 Jenkins - Docker - Kubernetes
 
+
+
  Q1) Can you proceed about your educational Background 
         Where are you from 
         How many years of experience
@@ -28,8 +30,36 @@ What are the steps you can perform its based on GCP CLOUD and you are the only p
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
 1. Have you faced a situation where a Docker image works in a lower environment but fails in a higher environment? How did you troubleshoot and fix it?
+Environmental Drift: Differences between Dev, Staging, and Prod.
+OOMKill: Out of Memory termination.
+Immutability: The fact that the image doesn't change, only the environment does.
+Pod Security Context: Settings that define privileges for a pod.
+Parity: Maintaining consistency between environments (from the 12-Factor App methodology)
+
+
 5. What is a Docker base image, and how do you decide which base image and version to use?
+
+A Base Image is the foundation of your Docker container. 
+It’s the initial layer in Dockerfile  —upon which you add your application code, dependencies, and configurations.
+ In a Dockerfile, it’s defined by the FROM instruction.
+Smaller images mean faster pull times, less storage, and, most importantly, a smaller security attack surface.
+I typically prefer Alpine Linux for its tiny footprint (~5MB) or Distroless images if I don't need a shell.
+If the application has complex C-library dependencies (like certain Python data science packages), 
+I might skip Alpine (which uses musl) and use a Slim version of Debian (which uses glibc) to avoid compilation headaches.Corporate Policy: 
+Often, we use a 'Golden Image'—a hardened base image maintained by our internal security team that already includes company-mandated certificates and monitoring agents.
+Beyond just choosing a base image, I focus on using hardened images. In my experience, we don't just pull an image and deploy it.
+We treat the base image as a starting point and 'harden' it by stripping out unnecessary binaries like ssh or package managers, and
+ensuring the container is configured to run as a non-root user. This aligns with the Principle of Least Privilege
+I never use the :latest tag in production. 
+I use specific version tags (e.g., python:3.11-slim). For high-compliance environments
+I recommend pinning the SHA256 digest to ensure the image hasn't been tampered with or changed.LTS (Long Term Support): 
+I stick to LTS versions of base OSs or runtimes to ensure we receive security patches for the duration of the project's lifecycle.
+
+Pro-Tip for the Interview:Mention that you use tools like Snyk, Trivy, or Docker Scout to scan these base images for vulnerabilities before they ever hit the container registry. 
+This shows you're thinking about the whole lifecycle, not just the code.
+
 8. What kind of issues have you faced in Docker or Kubernetes production, and how did you resolve them?
+
 11.Difference between Docker and Kuberenetes
 
 2. How do you debug an application that is not working after deployment on Kubernetes?
@@ -37,7 +67,56 @@ What are the steps you can perform its based on GCP CLOUD and you are the only p
 4. If application load suddenly increases in Kubernetes, how do you handle scaling using HPA or VPA?
 
 6. Can you explain the CI/CD pipeline you have worked on from code commit to Kubernetes deployment?
+
+I designed a DevSecOps-first pipeline focused on 'Shifting Left.' The process begins with Snyk performing SCA on our dependencies even before the build starts.
+Once validated, we move to the Maven build and integrated SonarQube to enforce a strict Quality Gate on our source code.
+After the build, we containerize the application. But before pushing to the registry, I use Trivy to scan the image for OS-level vulnerabilities.
+This ensures only 'vetted' images reach our Google Artifact Registry. Finally, after GCloud authentication, we trigger a rolling update on the GKE cluster.
+This multi-layered security approach ensures that we don't just deploy fast, but we deploy securely.
+
+
+Pipeline as a code ( Declarative pipeline )
+
+pipeline {
+    agent any
+    environment {
+        SCANNER_HOME = tool 'SonarQube'
+        GCP_PROJECT = 'my-project-id'
+    }
+    stages {
+        stage('Checkout') {
+            steps { checkout scm }
+        }
+        stage('Snyk Security Scan') {
+            steps { sh 'snyk test --severity-threshold=high' }
+        }
+        stage('Maven Build') {
+            steps { sh 'mvn clean package -DskipTests' }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+        stage('Docker Build & Trivy Scan') {
+            steps {
+                sh 'docker build -t gcr.io/${GCP_PROJECT}/my-app:${BUILD_NUMBER} .'
+                sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL gcr.io/${GCP_PROJECT}/my-app:${BUILD_NUMBER}'
+            }
+        }
+        stage('Push to GCR & Deploy') {
+            steps {
+                sh 'gcloud auth configure-docker'
+                sh 'docker push gcr.io/${GCP_PROJECT}/my-app:${BUILD_NUMBER}'
+                sh 'kubectl set image deployment/my-app my-app=gcr.io/${GCP_PROJECT}/my-app:${BUILD_NUMBER}'
+            }
+        }
+    }
+}
 7. How do you design a multibranch or multi-stage pipeline where different branches deploy to different environments?
 
 9. What monitoring tools have you used, and how do they help in identifying and resolving issues?
+
 10. How do you authenticate your CI/CD pipeline with GCP and push Docker images to the registry?
