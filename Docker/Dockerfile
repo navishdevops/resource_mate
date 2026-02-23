@@ -201,34 +201,24 @@ CMD java -Dspring.profiles.active=${profile} -Xms3072m -Xmx5120m -jar /app/java/
 =================================================================================================================================================
 # Stage 1: Download dependencies as wheels
 FROM python:3.11-slim AS wheel-downloader
-
 WORKDIR /wheeldownload
-
 COPY ./app/requirements.txt .
-
 RUN apt-get update && apt-get install -y build-essential gcc && \
     pip install --upgrade pip && \
     mkdir /wheels && \
     pip download --no-cache-dir -r requirements.txt -d /wheels
-
 # Stage 2: Final build using pre-downloaded wheels
 FROM python:3.11-slim
-
 WORKDIR /app
-
 # Copy your application code
 COPY ./app /app
-
 # Copy wheels and requirements.txt from the first stage
 COPY --from=wheel-downloader /wheels /app/wheels
 COPY ./app/requirements.txt /app/requirements.txt
-
 # Install dependencies from local wheel folder
 RUN pip3 install --upgrade pip && \
     pip3 install --no-index --find-links=/app/wheels -r /app/requirements.txt
-
 EXPOSE 5010
-
 CMD ["gunicorn", "-b", "0.0.0.0:5010", "autostacking:app", "--timeout", "4000", "--log-level", "debug"]
 
 
