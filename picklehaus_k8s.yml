@@ -1,0 +1,261 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: picklehaus
+  labels:
+    name: picklehaus
+    env: prod
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: vgd-quota
+  namespace: picklehaus
+spec:
+  hard:
+    pods: "20"
+    requests.cpu: "2"
+    requests.memory: 2Gi
+    limits.cpu: "4"
+    limits.memory: 4Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: vgd-limits
+  namespace: picklehaus
+spec:
+  limits:
+  - default:
+      cpu: 500m
+      memory: 512Mi
+    defaultRequest:
+      cpu: 200m
+      memory: 256Mi
+    type: Container
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vgd-utils
+  namespace: picklehaus
+spec:
+  containers:
+  - name: tools
+    image: busybox
+    command: ["sleep", "3600"]
+    restartPolicy: Always
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: vgd-rc
+  namespace: picklehaus
+spec:
+  replicas: 4
+  selector:
+    app: vgd-legacy
+  template:
+    metadata:
+      labels:
+        app: vgd-legacy
+    spec:
+      containers:
+      - name: old-app
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: vgd-rs
+  namespace: picklehaus
+  labels:
+        tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      tier: backend
+  template:
+    metadata:
+      labels:
+        tier: backend
+    spec:
+      containers:
+      - name: db-helper
+        image: redis:7-alpine
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vgd-order-app
+  namespace: picklehaus
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vgdorder
+  template:
+    metadata:
+      labels:
+        app: vgdorder
+    spec:
+      containers:
+      - name: vgd-container
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: storage
+          mountPath: /data
+        envFrom:
+        - configMapRef:
+            name: vgd-cm
+        - secretRef:
+            name: vgd-sec
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: vgd-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vgd-svc
+  namespace: picklehaus
+spec:
+  type: LoadBalancer
+  selector:
+    app: vgdorder
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vgd-hpa
+  namespace: picklehaus
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: vgd-order-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vgd-logger
+  namespace: picklehaus
+spec:
+  selector:
+    matchLabels:
+      name: fluentd
+  template:
+    metadata:
+      labels:
+        name: fluentd
+    spec:
+      containers:
+      - name: fluentd
+        image: quay.io/fluentd_elasticsearch/fluentd:v2.5.2
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: vgd-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vgd-pvc
+  namespace: picklehaus
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vgd-cm
+  namespace: picklehaus
+data:
+  DB_URL: "jdbc:mysql://vgd-db:3306/orders"
+  LOG_LEVEL: "INFO"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vgd-sec
+  namespace: picklehaus
+type: Opaque
+data:
+  API_KEY: dmdkb3JkZXJfc2VjcmV0X2tleQ== # vgdorder_secret_key
+  DB_PASSWORD: cGFzc3dvcmQ= # password
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: vgd-prod
+  name: vgd-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vgd-read-bind
+  namespace: vgd-prod
+subjects:
+- kind: User
+  name: jagadish
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: vgd-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vgd-cluster-admin
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vgd-global-bind
+subjects:
+- kind: User
+  name: jagadish
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: vgd-cluster-admin
+  apiGroup: rbac.authorization.k8s.io
