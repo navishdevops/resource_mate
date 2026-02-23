@@ -1,0 +1,43 @@
+Jenkins - Docker - Kubernetes
+
+ Q1) Can you proceed about your educational Background 
+        Where are you from 
+        How many years of experience
+        What you are good at like AWS - AZURE - GCP
+ Q2) which is your primary skil AZURE or GCP or AWS
+ Q3) have you worked on writing Jenkinsfiles - declarative pipelines - Dockerfiles
+ Q4) What makes the difference between Docker and Kubernetes
+ Q5) How do you manage the 99.99% uptime on the application
+ Q6) Java based application - thats working fine in local and pushed into Dev 
+                                       In Dev its working fine
+                                       Later once moved to staging its giving runtime exceptions
+                                       What could be the issue?
+                                       Will it be devops configuration issue?
+                                       Or will it be java code issue? Who needs to take the action immediately
+    Build status is success in the pipeline,                                                                                                                                                                                                 How you make sure the application run as expected
+                                   What are the steps which you will check
+  Q7) How confident you are at GCP? 
+  Q8) How long you are not associated with your previous organisation and 
+         Why is there 4 months of GAP?
+  Q9) Why you left your previous job?
+  Q10) what is your expected CTC? In technical Round
+  Q11) How will you provide the github access to the resources
+  
+GITHUB - JIRA - JENKINS setup need to be perform 
+What are the steps you can perform its based on GCP CLOUD and you are the only point of contact.
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+1. Have you faced a situation where a Docker image works in a lower environment but fails in a higher environment? How did you troubleshoot and fix it?
+5. What is a Docker base image, and how do you decide which base image and version to use?
+8. What kind of issues have you faced in Docker or Kubernetes production, and how did you resolve them?
+11.Difference between Docker and Kuberenetes
+
+2. How do you debug an application that is not working after deployment on Kubernetes?
+3. What steps do you follow when a Kubernetes pod goes into CrashLoopBackOff or ImagePullBackOff?
+4. If application load suddenly increases in Kubernetes, how do you handle scaling using HPA or VPA?
+
+6. Can you explain the CI/CD pipeline you have worked on from code commit to Kubernetes deployment?
+7. How do you design a multibranch or multi-stage pipeline where different branches deploy to different environments?
+
+9. What monitoring tools have you used, and how do they help in identifying and resolving issues?
+10. How do you authenticate your CI/CD pipeline with GCP and push Docker images to the registry?
